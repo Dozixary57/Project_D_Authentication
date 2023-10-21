@@ -1,0 +1,25 @@
+{
+  "name": "project_d_auth",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server",
+    "nodemon": "nodemon server",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/auth": "^4.3.0",
+    "@fastify/cookie": "^9.1.0",
+    "@fastify/cors": "^8.3.0",
+    "@fastify/jwt": "^7.2.0",
+    "@fastify/mongodb": "^7.0.0",
+    "@fastify/routes": "^5.1.0",
+    "bcrypt": "^5.1.1",
+    "fastify": "^4.21.0",
+    "nodemon": "^3.0.1"
+  }
+}

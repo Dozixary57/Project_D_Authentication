@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const fastifyUUID = require("fastify-uuid");
 module.exports = async function (fastify) {
     // CORS
     fastify.register(require('@fastify/cors'), {
@@ -45,5 +46,13 @@ module.exports = async function (fastify) {
     }).ready(()=> {
         console.log('@Fastify/Cookie успешно зарегестрирован!')
     })
+
+/*    fastify.register(require('fastify-user-agent')).ready(()=> {
+        console.log('Fastify-user-agent успешно зарегестрирован!')
+    });*/
+
+    fastify.register(fastifyUUID).ready(()=> {
+        console.log('Fastify-UUID успешно зарегестрирован!')
+    });
 
 }

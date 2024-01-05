@@ -44,7 +44,7 @@ module.exports = async (fastify) => {
             } )*/
             // maxAge: 1209600 -14d
             // await new Promise(resolve => setTimeout(resolve, 1000)); // Задержка на 1 секунду
-            reply.setCookie('RefreshToken', refreshToken, {maxAge: 600, path: '/', signed: true, httpOnly: true, secure: 'auto'}).setCookie('UniqueDeviceIdentifier', fastify.uuid.v4(), {maxAge: 600, path: '/', signed: true, httpOnly: true, secure: 'auto'}).send({ accessToken, msgSuccess: 'Login to the account was completed successfully.' });
+            reply.setCookie('RefreshToken', refreshToken, {maxAge: 600, path: '/', signed: true, httpOnly: true, secure: 'auto'}).setCookie('UniqueDeviceIdentifier', fastify.uuid.v4(), {maxAge: 600, path: '/', signed: true, httpOnly: false, secure: 'auto'}).send({ accessToken, msgSuccess: 'Login to the account was completed successfully.' });
             await console.log('Успешный вход в аккаунт.')
             return
         } else {

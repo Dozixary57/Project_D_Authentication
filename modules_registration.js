@@ -16,7 +16,7 @@ module.exports = async function (fastify) {
     fastify.register(require('@fastify/mongodb'), {
         forceClose: true,
         url: "mongodb+srv://dozixary57:_pP-s8s5q2LFyaT@cluster0.lut9y3e.mongodb.net/?retryWrites=true&w=majority",
-        database: "WebsiteProjectD"
+        database: "ProjectD_Accounts"
     }).ready(()=> {
         console.log('@Fastify/MongoDB успешно зарегестрирован!')
     })
@@ -32,7 +32,12 @@ module.exports = async function (fastify) {
         },
         sign: {
             algorithm: 'RS256',
+            expiresIn: '1m',
             iss: 'http://localhost:7000'
+        },
+        cookie: {
+            cookieName: 'RefreshToken',
+            signed: true
         }
     }).ready(()=> {
         console.log('@Fastify/JWT успешно зарегестрирован!')

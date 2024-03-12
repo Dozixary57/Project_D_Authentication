@@ -16,6 +16,16 @@
         reply.send('Server is running!')
     })
 
+    const verify_jwt = require('./tools/verify_jwt')
+    await verify_jwt(fastify)
+
+    // const TEST = require('./routes/test')
+    // await TEST(fastify)
+
+
+    const logout_func = require('./tools/logout')
+    await logout_func(fastify)
+
     // Declare a main routes
     const signup = require('./routes/signup')
     await signup(fastify)
@@ -23,11 +33,14 @@
     const login = require('./routes/login')
     await login(fastify)
 
-    const protected_data = require('./routes/protected_data')
-    await protected_data(fastify)
+    const isAuth = require('./routes/is_auth')
+    await isAuth(fastify)
 
     const logout = require('./routes/logout')
     await logout(fastify)
+
+    const protected_data = require('./routes/protected_data')
+    await protected_data(fastify)
 
     // Error handler for non-existent routes
     fastify.setNotFoundHandler((req, reply) => {

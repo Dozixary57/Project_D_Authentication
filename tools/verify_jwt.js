@@ -2,7 +2,6 @@ module.exports = async (fastify) => {
    fastify.decorate('verifyJWT', function () {
       return async function (req, reply) {
          try {
-
             await req.jwtVerify();
             const authHeader = req.headers['authorization'];
 
@@ -17,7 +16,8 @@ module.exports = async (fastify) => {
                   const refreshTokenData = fastify.unsignCookie(req.cookies.RefreshToken);
    
                   // msg: 'RefreshToken is not valid'
-                  if (!refreshTokenData.value) return reply.status(401).send();
+                  if (!refreshTokenData.value)
+                     return reply.status(401).send();
    
                   const refreshToken = refreshTokenData.value;
    
@@ -45,7 +45,8 @@ module.exports = async (fastify) => {
                const refreshTokenData = fastify.unsignCookie(req.cookies.RefreshToken);
 
                // msg: 'RefreshToken is not valid'
-               if (!refreshTokenData.value) return reply.status(401).send();
+               if (!refreshTokenData.value)
+                  return reply.status(401).send();
 
                const refreshToken = refreshTokenData.value;
 

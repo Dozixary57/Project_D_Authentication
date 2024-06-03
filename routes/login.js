@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 const UDI_Generator = require("../tools/UniqueDeviceIdentifier_Generator");
+const Logger = require('../tools/Logger');
 
 const collection = "Accounts"
 
@@ -18,7 +19,7 @@ module.exports = async (fastify) => {
             })
 
             if (!account) {
-                return reply.status(200).send({ usernameEmailErrMsg: 'An account with this email or username does not exist.' });
+                return reply.status(401).send({ usernameEmailErrMsg: 'An account with this email or username does not exist.' });
             }
 
             const match = await bcrypt.compare(Password, account.Password);
@@ -37,7 +38,7 @@ module.exports = async (fastify) => {
                 return reply.setCookie('RefreshToken', refreshToken, {maxAge: 600, path: '/', signed: true, httpOnly: true, secure: 'auto'}).setCookie('UniqueDeviceIdentifier', fastify.uuid.v4(), {maxAge: 600, path: '/', signed: true, httpOnly: false, secure: 'auto'}).send({ accessToken, message: 'Login to the account was completed successfully.' });
             } else {
                 // await console.log('Ошибка авторизации.')            
-                return reply.status(200).send({ passwordErrMsg: 'Incorrect Password.' });
+                return reply.status(401).send({ passwordErrMsg: 'Incorrect Password.' });
             }
         } catch (e) {
             console.log(e)

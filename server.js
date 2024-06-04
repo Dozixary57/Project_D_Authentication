@@ -16,6 +16,12 @@
         reply.send('Server is running!')
     })
 
+    // const create_jwt_session = require('./functions/create_jwt_session')
+    // await create_jwt_session(fastify)
+
+    const create_access_token = require('./functions/create_access_token')
+    await create_access_token(fastify)
+
     const verify_jwt = require('./tools/verify_jwt')
     await verify_jwt(fastify)
 

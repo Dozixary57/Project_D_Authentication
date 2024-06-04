@@ -1,6 +1,4 @@
 const bcrypt = require('bcrypt');
-const UDI_Generator = require("../tools/UniqueDeviceIdentifier_Generator");
-const Logger = require('../tools/Logger');
 
 const collection = "Accounts"
 
@@ -25,11 +23,69 @@ module.exports = async (fastify) => {
             const match = await bcrypt.compare(Password, account.Password);
 
             if (match) {
+                const ObjectId = fastify.mongo.ObjectId;
+                const userPrivilegesPipeline = [
+                    {
+                        $match: {
+                        _id: new ObjectId(account._id)
+                        }
+                    },
+                    {
+                        $unwind: {
+                        path: "$Privileges",
+                        preserveNullAndEmptyArrays: true
+                        }
+                    },
+                    {
+                        $lookup: {
+                        from: "UserPrivileges",
+                        localField: "Privileges",
+                        foreignField: "_id",
+                        as: "PrivilegeDetails"
+                        }
+                    },
+                    {
+                        $unwind: {
+                        path: "$PrivilegeDetails",
+                        preserveNullAndEmptyArrays: true
+                        }
+                    },
+                    {
+                        $group: {
+                        _id: "$_id",
+                        Username: { $first: "$Username" },
+                        Email: { $first: "$Email" },
+                        DateOfBirth: { $first: "$DateOfBirth" },
+                        Status: { $first: "$Status" },
+                        Privileges: { $push: "$PrivilegeDetails.Title" }
+                        }
+                    },
+                    {
+                        $project: {
+                        Username: 1,
+                        Email: 1,
+                        DateOfBirth: 1,
+                        Status: 1,
+                        Privileges: {
+                            $cond: { if: { $eq: [[], "$Privileges"] }, then: null, else: "$Privileges" }
+                        }
+                        }
+                    }
+                ];
+
+                let accessTokenPayload = { 
+                    id: account._id,
+                    username: account.Username  
+                };
+                
+                const userPrivileges = await fastify.mongo.db.collection('Accounts').aggregate(userPrivilegesPipeline).toArray();
+
+                if (userPrivileges[0].Privileges) {
+                    accessTokenPayload.privileges = userPrivileges[0].Privileges;
+                }  
+                
                 const refreshToken = fastify.jwt.sign({id: account._id, username: account.Username}, {sub: 'refreshToken', expiresIn: '10m'})
-                const accessToken = fastify.jwt.sign({id: account._id, username: account.Username}, {sub: 'accessToken', expiresIn: '1m'})
-
-                // console.log('1! ' + refreshToken)
-
+                const accessToken = fastify.jwt.sign(accessTokenPayload, {sub: 'accessToken', expiresIn: '1m'})
 
                 // console.log(fastify.jwt.decode(refreshToken))
                 // maxAge: 1209600 -14d

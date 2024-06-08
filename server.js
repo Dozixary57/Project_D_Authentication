@@ -1,5 +1,7 @@
 (async () => {
-    const fastify = require('fastify')()
+    // const fastify = require('fastify')({logger: true})
+    const fastify = require('fastify')();
+
     const fs = require("fs");
     const path = require("path");
 
@@ -19,11 +21,11 @@
     // const create_jwt_session = require('./functions/create_jwt_session')
     // await create_jwt_session(fastify)
 
-    const create_access_token = require('./functions/create_access_token')
-    await create_access_token(fastify)
-
     const verify_jwt = require('./tools/verify_jwt')
     await verify_jwt(fastify)
+
+    const new_access_token = require('./functions/new_access_token')
+    await new_access_token(fastify)
 
     // const TEST = require('./routes/test')
     // await TEST(fastify)

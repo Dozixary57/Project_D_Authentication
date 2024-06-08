@@ -84,7 +84,7 @@ module.exports = async (fastify) => {
                     accessTokenPayload.privileges = userPrivileges[0].Privileges;
                 }  
                 
-                const refreshToken = fastify.jwt.sign({id: account._id, username: account.Username}, {sub: 'refreshToken', expiresIn: '10m'})
+                const refreshToken = fastify.jwt.sign({id: account._id}, {sub: 'refreshToken', expiresIn: '10m'})
                 const accessToken = fastify.jwt.sign(accessTokenPayload, {sub: 'accessToken', expiresIn: '1m'})
 
                 // console.log(fastify.jwt.decode(refreshToken))

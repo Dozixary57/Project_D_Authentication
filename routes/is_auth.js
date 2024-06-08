@@ -4,7 +4,7 @@ const jwt = require('@fastify/jwt');
 
 module.exports = async (fastify) => {
 
-   fastify.get('/Auth', { preHandler: fastify.verifyJWT() }, async function (req, reply) {
+   fastify.get('/Auth', { preHandler: fastify.verifyJWT() }, async function () {
       try {
          return;
       } catch (e) {

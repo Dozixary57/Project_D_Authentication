@@ -18,8 +18,6 @@
         reply.send('Server is running!')
     })
 
-    // const create_jwt_session = require('./functions/create_jwt_session')
-    // await create_jwt_session(fastify)
 
     const verify_jwt = require('./tools/verify_jwt')
     await verify_jwt(fastify)
@@ -29,7 +27,6 @@
 
     // const TEST = require('./routes/test')
     // await TEST(fastify)
-
 
     const logout_func = require('./tools/logout')
     await logout_func(fastify)
@@ -46,6 +43,9 @@
 
     const logout = require('./routes/logout')
     await logout(fastify)
+
+    const accounts = require('./routes/accounts')
+    await accounts(fastify)
 
     const protected_data = require('./routes/protected_data')
     await protected_data(fastify)

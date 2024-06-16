@@ -84,14 +84,14 @@ module.exports = async (fastify) => {
                     accessTokenPayload.privileges = userPrivileges[0].Privileges;
                 }  
                 
-                const refreshToken = fastify.jwt.sign({id: account._id}, {sub: 'refreshToken', expiresIn: '10m'})
+                const refreshToken = fastify.jwt.sign({id: account._id}, {sub: 'refreshToken', expiresIn: '14d'})
                 const accessToken = fastify.jwt.sign(accessTokenPayload, {sub: 'accessToken', expiresIn: '1m'})
 
                 // console.log(fastify.jwt.decode(refreshToken))
                 // maxAge: 1209600 -14d
                 // await new Promise(resolve => setTimeout(resolve, 1000)); // Задержка на 1 секунду
                 // await console.log('Успешный вход в аккаунт.')
-                return reply.setCookie('RefreshToken', refreshToken, {maxAge: 600, path: '/', signed: true, httpOnly: true, secure: 'auto'}).setCookie('UniqueDeviceIdentifier', fastify.uuid.v4(), {maxAge: 600, path: '/', signed: true, httpOnly: false, secure: 'auto'}).send({ accessToken, message: 'Login to the account was completed successfully.' });
+                return reply.setCookie('RefreshToken', refreshToken, {maxAge: 1209600, path: '/', signed: true, httpOnly: true, secure: 'auto'}).setCookie('UniqueDeviceIdentifier', fastify.uuid.v4(), {maxAge: 1209600, path: '/', signed: true, httpOnly: false, secure: 'auto'}).send({ accessToken, message: 'Login to the account was completed successfully.' });
             } else {
                 // await console.log('Ошибка авторизации.')            
                 return reply.status(401).send({ passwordErrMsg: 'Incorrect Password.' });

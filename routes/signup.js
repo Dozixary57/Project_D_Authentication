@@ -39,7 +39,7 @@ module.exports = async (fastify) => {
             const hashedPassword = await bcrypt.hash(Password, saltRounds);
     
             await fastify.mongo.db.collection(collection).insertOne({
-                Username: Username,  Email: Email, DateOfBirth: dateOfBirthFormatted, Password: hashedPassword
+                Username: Username, AccountStatus: 'Active', Email: Email, DateOfBirth: dateOfBirthFormatted, Password: hashedPassword
             })
 
             const createdAccount = await fastify.mongo.db.collection(collection).findOne({

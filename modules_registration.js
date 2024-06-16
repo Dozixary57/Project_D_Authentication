@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const fastifyUUID = require("fastify-uuid");
+
 module.exports = async function (fastify) {
     // CORS
     fastify.register(require('@fastify/cors'), {
@@ -20,6 +21,9 @@ module.exports = async function (fastify) {
     }).ready(()=> {
         console.log('@Fastify/MongoDB успешно зарегестрирован!')
     })
+
+    const MercuriusQueries = require('./MercuriusQueries/MercuriusQueries')
+    await MercuriusQueries(fastify)
 
     const privateKey = fs.readFileSync(path.join(process.cwd(), 'CryptoKeyPair', 'privateKey.pem'), 'utf8');
     const publicKey = fs.readFileSync(path.join(process.cwd(), 'CryptoKeyPair', 'publicKey.pem'), 'utf8');

@@ -45,7 +45,12 @@ module.exports = async (fastify) => {
               Email: { $first: "$Email" },
               DateOfBirth: { $first: "$DateOfBirth" },
               Status: { $first: "$Status" },
-              Privileges: { $push: "$PrivilegeDetails.Title" }
+              Privileges: {
+                $push: {
+                  _id: "$PrivilegeDetails._id",
+                  Title: "$PrivilegeDetails.Title"
+                }
+              }
             }
           },
           {
@@ -62,14 +67,14 @@ module.exports = async (fastify) => {
         ];
 
         let accessTokenPayload = {
-          id: account._id,
-          username: account.Username
+          _id: account._id,
+          Username: account.Username
         };
 
-        const userPrivileges = await fastify.mongo.db.collection(collection).aggregate(userPrivilegesPipeline).toArray();
+        const userPrivileges = await fastify.mongo.db.collection('Accounts').aggregate(userPrivilegesPipeline).toArray();
 
-        if (userPrivileges[0].Privileges) {
-          accessTokenPayload.privileges = userPrivileges[0].Privileges;
+        if (userPrivileges && userPrivileges[0] && userPrivileges[0].Privileges) {
+          accessTokenPayload.Privileges = userPrivileges[0].Privileges;
         }
 
         return fastify.jwt.sign(accessTokenPayload, { sub: 'accessToken', expiresIn: '1m' })

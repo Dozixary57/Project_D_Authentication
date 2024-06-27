@@ -30,8 +30,14 @@ module.exports = async (fastify) => {
                const refreshToken = refreshTokenData.value;
 
                const decoded = fastify.jwt.decode(refreshToken);
-                        
-               return reply.status(200).send({ accessToken: await fastify.newAccessToken()(decoded.id) });
+
+               const newAccessToken = await fastify.newAccessToken()(decoded._id);
+               
+               if (newAccessToken) {
+                  return reply.status(200).send({ accessToken: newAccessToken });
+               } else {
+                  return reply.status(401).send({ msg: 'You should log in again' });
+               }
 
             } catch (refreshTokenError) {
 
@@ -42,4 +48,67 @@ module.exports = async (fastify) => {
          }
       }
    });
+
+   // fastify.decorate('verify_privilege_UserPrivilegesManaging', function () {
+   //    return async function (req, reply) {
+   //       try {
+
+   //          await req.jwtVerify();
+
+   //          const authHeader = req.headers['authorization'];
+
+   //          if (authHeader == undefined && authHeader.split(' ')[1] == null) {
+   //             throw UserPrivilegeError;
+   //          }
+
+   //          const account = await fastify.mongo.db.collection('Accounts').findOne({ _id: new fastify.mongo.ObjectId(req.user._id) });
+
+   //          if (!account)
+   //             throw UserPrivilegeError;
+
+   //          const userPrivileges = await fastify.mongo.db.collection('UserPrivileges').find({ _id: { $in: account.Privileges || [] } }).toArray();            
+   //          const userPrivilege = userPrivileges.find(userPrivilege => userPrivilege.Title === 'UserPrivilegesManaging');
+            
+   //          if (!userPrivilege)
+   //             throw UserPrivilegeError;
+            
+   //       } catch (UserPrivilegeError) {
+   //          return reply.status(401).send({ msg: 'Access denied' });
+   //       }
+   //    }
+   // });
+
+   fastify.decorate('verify_privilegeByName', function (...privilegeName) {
+      return async function (req, reply) {
+         try {
+
+            await req.jwtVerify();
+
+            const authHeader = req.headers['authorization'];
+
+            if (authHeader == undefined && authHeader.split(' ')[1] == null) {
+               throw UserPrivilegeError;
+            }
+
+            const account = await fastify.mongo.db.collection('Accounts').findOne({ _id: new fastify.mongo.ObjectId(req.user._id) });
+
+            if (!account)
+               throw UserPrivilegeError;
+
+            const userPrivileges = await fastify.mongo.db.collection('UserPrivileges').find({ _id: { $in: account.Privileges || [] } }).toArray();
+
+            const privilegeNames = Array.isArray(privilegeName) ? privilegeName : [privilegeName];
+            const hasAllPrivileges = privilegeNames.every(title => 
+              userPrivileges.some(userPrivilege => userPrivilege.Title === title)
+            );
+                        
+            if (!hasAllPrivileges)
+               throw UserPrivilegeError;
+            
+         } catch (UserPrivilegeError) {
+            return reply.status(401).send({ msg: 'Access denied' });
+         }
+      }
+   });
+
 }

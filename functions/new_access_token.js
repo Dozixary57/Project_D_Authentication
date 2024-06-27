@@ -1,7 +1,7 @@
 const Logger = require("../tools/Logger");
 
 module.exports = async (fastify) => {
-  fastify.decorate('newAccessToken', function () {
+  fastify.decorate('newAccessToken', function ( ) {
     return async function (accountId) {
       try {
         const collection = "Accounts";
@@ -9,7 +9,7 @@ module.exports = async (fastify) => {
         const account = await fastify.mongo.db.collection(collection).findOne({ _id: new fastify.mongo.ObjectId(accountId) });
 
         if (!account) {
-          return reply.status(401).send({ usernameEmailErrMsg: 'An account with this email or username does not exist.' });
+          return null;
         }
 
         const userPrivilegesPipeline = [

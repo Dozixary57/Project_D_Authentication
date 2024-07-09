@@ -19,8 +19,8 @@
     })
 
 
-    const verify_jwt = require('./tools/verify_jwt')
-    await verify_jwt(fastify)
+    const jwt = require('./tools/jwt')
+    await jwt(fastify)
 
     const new_access_token = require('./functions/new_access_token')
     await new_access_token(fastify)

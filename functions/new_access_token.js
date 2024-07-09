@@ -77,7 +77,7 @@ module.exports = async (fastify) => {
           accessTokenPayload.Privileges = userPrivileges[0].Privileges;
         }
 
-        return fastify.jwt.sign(accessTokenPayload, { sub: 'accessToken', expiresIn: '1m' })
+        return fastify.jwt.sign(accessTokenPayload, { sub: 'accessToken', expiresIn: '15s' })
 
       } catch (error) {
         console.log(error);

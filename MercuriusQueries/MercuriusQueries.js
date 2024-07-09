@@ -4,43 +4,39 @@ const Logger = require('../tools/Logger');
 module.exports = async function (fastify) {
 
   const schema = `
+    type Titles {
+      _id: String
+      Title: String
+    }
+
+    type Privileges {
+      _id: String
+      Title: String
+    }
+
     type Accounts {
       _id: String
       Username: String
-      AccountStatus: String
+      Status: String
       Email: String
-    }
-
-    type status {
-      _id: String
-      Title: String
-    }
-
-    type privileges {
-      _id: String
-      Title: String
     }
 
     type Account {
       _id: String
       Username: String
-      AccountStatus: String
-      Status: status
+      Status: String
+      Title: Titles
       Email: String
       DateOfBirth: String
-      Privileges: [privileges]
-    }
-
-    type Statuses {
-      _id: String
-      Title: String
+      Privileges: [Privileges]
     }
 
     type Query {
       AccountsQuery: [Accounts]
       AccountQuery(ParamsId: String!): Account
-      StatusesQuery: [Statuses]
-      PrivilegesQuery: [privileges]
+      DeletedAccountQuery(ParamsId: String!): Account
+      TitlesQuery: [Titles]
+      PrivilegesQuery: [Privileges]
     }
     `;
 
@@ -52,7 +48,7 @@ module.exports = async function (fastify) {
         const result = await Promise.all(accounts.map(document => ({
           _id: document._id,
           Username: document.Username,
-          AccountStatus: document.AccountStatus,
+          Status: document.Status,
           Email: document.Email,
         })));
         return result;
@@ -60,16 +56,16 @@ module.exports = async function (fastify) {
       AccountQuery: async (obj, { ParamsId }, context) => {
         const account = await fastify.mongo.db.collection('Accounts').findOne({ _id: new fastify.mongo.ObjectId(ParamsId) });
       
-        const userStatus = await fastify.mongo.db.collection('UserStatus').findOne({ _id: new fastify.mongo.ObjectId(account.Status) });
+        const userTitle = await fastify.mongo.db.collection('UserTitles').findOne({ _id: new fastify.mongo.ObjectId(account.Title) });
 
-        let status;
+        let title;
 
-        if (!userStatus) {
-          status = null;
+        if (!userTitle) {
+          title = null;
         } else {
-          status = {
-            _id: userStatus._id,
-            Title: userStatus.Title
+          title = {
+            _id: userTitle._id,
+            Title: userTitle.Title
           }
         }
 
@@ -89,17 +85,17 @@ module.exports = async function (fastify) {
         return {
           _id: account._id,
           Username: account.Username,
-          AccountStatus: account.AccountStatus,
-          Status: status,
+          Status: account.Status,
+          Title: title,
           Email: account.Email,
           DateOfBirth: account.DateOfBirth,
           Privileges: privileges
         };
       },
-      StatusesQuery: async () => {
-        const statuses = await fastify.mongo.db.collection('UserStatus').find().toArray()
+      TitlesQuery: async () => {
+        const titles = await fastify.mongo.db.collection('UserTitles').find().toArray()
 
-        const result = await Promise.all(statuses.map(document => ({
+        const result = await Promise.all(titles.map(document => ({
           _id: document._id,
           Title: document.Title,
         })));

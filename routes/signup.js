@@ -1,5 +1,6 @@
 const axios = require('axios');
 const bcrypt = require('bcrypt');
+const { Title } = require('../tools/Logger');
 const saltRounds = 10;
 
 const collection = "Accounts"
@@ -39,7 +40,7 @@ module.exports = async (fastify) => {
             const hashedPassword = await bcrypt.hash(Password, saltRounds);
     
             await fastify.mongo.db.collection(collection).insertOne({
-                Username: Username, AccountStatus: 'Active', Email: Email, DateOfBirth: dateOfBirthFormatted, Password: hashedPassword
+                Username: Username, Title: new fastify.mongo.ObjectId("65f4af7ecff76e4d9800b0b3"), Status: 'Active', Email: Email, DateOfBirth: dateOfBirthFormatted, Password: hashedPassword
             })
 
             const createdAccount = await fastify.mongo.db.collection(collection).findOne({
@@ -50,12 +51,9 @@ module.exports = async (fastify) => {
             })
 
             if (createdAccount) {
-                const refreshToken = fastify.jwt.sign({id: createdAccount._id, username: createdAccount.Username}, {sub: 'refreshToken', expiresIn: '10m'})
-                const accessToken = fastify.jwt.sign({id: createdAccount._id, username: createdAccount.Username}, {sub: 'accessToken', expiresIn: '1m'})    
-    
-                // maxAge: 1209600 -14d
-                reply.status(200).setCookie('RefreshToken', refreshToken, {maxAge: 600, path: '/', signed: true, httpOnly: true, secure: 'auto'}).setCookie('UniqueDeviceIdentifier', fastify.uuid.v4(), {maxAge: 600, path: '/', signed: true, httpOnly: false, secure: 'auto'}).send({ accessToken, message: 'The account has been successfully registered' });    
-                return;
+                const refreshToken = fastify.jwt.sign({ _id: createdAccount._id }, {sub: 'refreshToken', expiresIn: '14d'})
+
+                return reply.status(200).setCookie('RefreshToken', refreshToken, { maxAge: 1209600, path: '/', signed: true, httpOnly: true, sameSite: 'none', secure: 'true' }).send({ accessToken: await fastify.newAccessToken()(createdAccount._id), msg: 'Sign up was completed successfully.' });
             }
 
             return;    

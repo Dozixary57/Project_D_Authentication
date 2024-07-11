@@ -370,3 +370,6 @@ CryptoKeyPair/
 
 Images/Avatars/*
 !/Images/Avatars/.gitkeep
+
+CryptoKeyPair/*
+!/CryptoKeyPair/.gitkeep

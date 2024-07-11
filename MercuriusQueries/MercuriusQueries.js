@@ -120,6 +120,6 @@ module.exports = async function (fastify) {
     resolvers,
     graphiql: false,
   }).ready(() => {
-    Logger.Server.Ok('@Fastify/Mercurius успешно зарегестрирован!');
+    Logger.Server.Info('@Fastify/Mercurius успешно зарегестрирован!');
   });
 }

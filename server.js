@@ -28,6 +28,9 @@
     // const TEST = require('./routes/test')
     // await TEST(fastify)
 
+    const profile_avatars = require('./routes/profile_avatars')
+    await profile_avatars(fastify)
+
     const logout_func = require('./tools/logout')
     await logout_func(fastify)
 

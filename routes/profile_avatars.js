@@ -1,5 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const fileType = require('file-type-cjs');
+const mime = require('mime-types');
+const sharp = require('sharp');
+const mongodb = require("mongodb");
 
 module.exports = async function (fastify) {
 
@@ -7,37 +11,350 @@ module.exports = async function (fastify) {
     try {
       const dirPath = path.join(process.cwd(), 'Images', 'Avatars');
 
+      const ignoredFiles = ['.gitkeep'];
+
       let filesInfo = {};
 
-      const files = fs.readdirSync(dirPath);
+      const files = fs.readdirSync(dirPath).filter(file => !ignoredFiles.includes(file));
       filesInfo.Quality = files.length;
 
-      let totalSizeB = 0;
+      let totalSize = 0;
       for (const file of files) {
         const filePath = path.join(dirPath, file);
         const stats = fs.statSync(filePath);
-        totalSizeB += stats.size;
+        totalSize += stats.size;
       }
-      filesInfo.SizeMB = Math.ceil((totalSizeB / (1024 * 1024)) * 100) / 100;
+      filesInfo.Size = totalSize;
 
       return reply.status(200).send({ file: filesInfo });
 
     } catch (err) {
       console.log(err);
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  fastify.get('/Avatars', async function (req, reply) {
+    try {
+      let serverFileUrlString = `${req.protocol}://${req.headers.host}/Avatars/`;
+      let databaseFileUrlString = `${req.protocol}://${req.headers.host}/Database/Avatars/`;
+
+      let files = [];
+
+      const filesDirPath = path.join(process.cwd(), 'Images', 'Avatars');
+      const ignoredFiles = ['.gitkeep'];
+
+      // file system read
+      const directoryFiles = fs.readdirSync(filesDirPath).filter(file => !ignoredFiles.includes(file));
+
+      // database read
+      const bucket = new mongodb.GridFSBucket(fastify.mongo.db, { bucketName: 'avatars' });
+      let fileCursor = bucket.find();
+      const dbFiles = await fileCursor.toArray();
+      const databaseFiles = dbFiles.map(file => file.filename);
+
+      // all files
+      const allFiles = [...new Set([...directoryFiles, ...databaseFiles])];
+
+      // console.log(allFiles);
+
+      for (const file of allFiles) {
+
+        // get file system stats part
+        const filePath = path.join(filesDirPath, file);
+
+        let fs_stats = null;
+
+        if (fs.existsSync(filePath)) {
+          fs_stats = fs.statSync(filePath);
+          const metadata = await sharp(filePath).metadata();
+
+          fs_stats = {
+            extension: path.extname(file),
+            format: mime.lookup(filePath).split('/')[0],
+            resolution: `${metadata.width}x${metadata.height}`,
+            size: fs_stats.size,
+            url: serverFileUrlString + file,
+          }
+
+          // console.log("1")
+          // console.log(fs_stats);
+        }
+
+        // get database stats part
+        const fileCursor = bucket.find({ filename: file });
+
+        let db_stats = null;
+
+        const db_file = await fileCursor.toArray();
+
+        if (db_file && db_file.length > 0) {
+          async function readStreamToBuffer(stream) {
+            return new Promise((resolve, reject) => {
+              const chunks = [];
+              stream.on('data', chunk => chunks.push(chunk));
+              stream.on('end', () => resolve(Buffer.concat(chunks)));
+              stream.on('error', err => reject(err));
+            });
+          }
+
+          const downloadStream = bucket.openDownloadStreamByName(file);
+
+          const buffer = await readStreamToBuffer(downloadStream);
+          if (buffer) {
+            const metadata = await sharp(buffer).metadata();
+
+            const fileTypeResult = await fileType.fromBuffer(buffer);
+            const extension = fileTypeResult ? `.${fileTypeResult.ext}` : '';
+
+            const mimeType = fileTypeResult ? fileTypeResult.mime : mime.lookup(extension);
+
+            const size = buffer.length;
+
+            db_stats = {
+              extension: extension,
+              format: mimeType.split('/')[0],
+              resolution: `${metadata.width}x${metadata.height}`,
+              size: size,
+              url: databaseFileUrlString + file,
+            }
+
+            // console.log("2")
+            // console.log(db_stats);
+
+            // console.log(extension);
+            // console.log(mimeType);
+            // console.log(size);
+
+            // console.log(metadata);
+          }
+
+          // reply.header('Content-Type', 'image/png').send(buffer);
+
+        }
+
+        let joint_stats = null;
+
+        if (fs_stats && db_stats) {
+          const fs_stats_keys = Object.keys(fs_stats).filter(key => key !== 'url');
+          const db_stats_keys = Object.keys(db_stats).filter(key => key !== 'url');
+
+          if (fs_stats_keys.length === db_stats_keys.length) {
+            let isEqual = true;
+            for (let key of fs_stats_keys) {
+              if (fs_stats[key] !== db_stats[key]) {
+                isEqual = false;
+                break;
+              }
+            }
+            if (isEqual) {
+              joint_stats = fs_stats;
+              fs_stats = null;
+              db_stats = null;
+            }
+          }
+        }
+
+        files.push({
+          filename: file,
+          fs_stats: fs_stats,
+          db_stats: db_stats,
+          joint_stats: joint_stats
+        });
+      }
+
+      reply.send(files);
+    } catch (err) {
+      console.log(err);
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // fastify.get('/Avatars', async function (req, reply) {
+  //   try {
+  //     let fileUrlString = `${req.protocol}:/${req.headers.host}/Avatars/`;
+
+  //     let files = [];
+
+  //     const filesDirPath = path.join(process.cwd(), 'Images', 'Avatars');
+  //     const ignoredFiles = ['.gitkeep'];
+  //     const directoryFiles = fs.readdirSync(filesDirPath).filter(file => !ignoredFiles.includes(file));
+
+  //     for (const file of directoryFiles) {
+  //       const filePath = path.join(filesDirPath, file);
+  //       const stats = fs.statSync(filePath);
+
+  //       const metadata = await sharp(filePath).metadata();
+
+  //       if (stats.isFile()) {
+  //         files.push({
+  //           filename: file,
+  //           extension: path.extname(file),
+  //           format: mime.lookup(filePath).split('/')[0],
+  //           resolution: `${metadata.width}x${metadata.height}`,
+  //           size: stats.size,
+  //           url: fileUrlString + file,
+  //         });
+  //       }
+  //     }
+
+
+  //     reply.send(files);
+  //   } catch (err) {
+  //     console.log(err);
+  //     return reply.status(500).send({ error: 'Internal Server Error' });
+  //   }
+  // });
+
+  fastify.get('/Avatars/:filename', async function (req, reply) {
+    try {
+      const filename = req.params.filename;
+      return reply.sendFile(filename);
+    } catch (err) {
+      console.log(err);
+      return reply.status(500).send({ error: 'Internal Server Error' });
     }
   });
 
   fastify.post('/Avatars', { preHandler: fastify.verifyJWT() }, async function (req, reply) {
     try {
-      const file = await req.file();
+      const parts = req.parts();
 
-      console.log(file);
+      let file;
+      let fileProperties;
+
+      // get file properties
+      for await (const part of parts) {
+        if (part.fieldname === 'file') {
+          file = part;
+        } else if (part.fieldname === 'fileProperties') {
+          fileProperties = JSON.parse(part.value);
+        }
+      }
+
+      if (!file || !fileProperties) {
+        return reply.status(400).send({ error: 'Missing file or file properties' });
+      }
+
+      const fileBuffer = await new Promise((resolve, reject) => {
+        const buffers = [];
+        file.file.on('data', (chunk) => buffers.push(chunk));
+        file.file.on('end', () => resolve(Buffer.concat(buffers)));
+        file.file.on('error', reject);
+      });
+
+      let uploadErrors = {};
+
+      // upload to server
+      const uploadToServer = async () => {
+        if (fileProperties.uploadToServer) {
+          const filePath = path.join(process.cwd(), 'Images', 'Avatars', file.filename);
+
+          if (fs.existsSync(filePath)) {
+            if (fileProperties.uploadServerRewrite) {
+              await fs.promises.writeFile(filePath, fileBuffer);
+              uploadErrors.errorUploadToServer = false;
+              uploadErrors.serverImageUrl = `${req.protocol}://${req.headers.host}/Avatars/${file.filename}`;
+            } else {
+              uploadErrors.errorUploadToServer = true;
+              uploadErrors.serverImageUrl = `${req.protocol}://${req.headers.host}/Avatars/${file.filename}`;
+            }
+          } else {
+            await fs.promises.writeFile(filePath, fileBuffer);
+            uploadErrors.errorUploadToServer = false;
+            uploadErrors.serverImageUrl = `${req.protocol}://${req.headers.host}/Avatars/${file.filename}`;
+          }
+        }
+      };
+
+      // upload to database
+      const uploadToDatabase = async () => {
+        if (fileProperties.uploadToDatabase) {
+          const bucket = new mongodb.GridFSBucket(fastify.mongo.db, { bucketName: 'avatars' });
+
+          let fileCursor = bucket.find({ filename: file.filename });
+          const files = await fileCursor.toArray();
+
+          if (files.length > 0) {
+            if (fileProperties.uploadDatabaseRewrite) {
+              for (const file of files) {
+                await bucket.delete(file._id);
+              }
+
+              const uploadStream = bucket.openUploadStream(file.filename);
+              const uploadStreamPromise = new Promise((resolve, reject) => {
+                uploadStream.on('error', reject);
+                uploadStream.on('finish', resolve);
+              });
+
+              uploadStream.end(fileBuffer);
+              await uploadStreamPromise;
+
+              uploadErrors.errorUploadToDatabase = false;
+              uploadErrors.databaseImageUrl = `${req.protocol}://${req.headers.host}/Database/Avatars/${file.filename}`;
+            } else {
+              uploadErrors.errorUploadToDatabase = true;
+              uploadErrors.databaseImageUrl = `${req.protocol}://${req.headers.host}/Database/Avatars/${file.filename}`;
+            }
+          } else {
+            const uploadStream = bucket.openUploadStream(file.filename);
+            const uploadStreamPromise = new Promise((resolve, reject) => {
+              uploadStream.on('error', reject);
+              uploadStream.on('finish', resolve);
+            });
+
+            uploadStream.end(fileBuffer);
+            await uploadStreamPromise;
+
+            uploadErrors.errorUploadToDatabase = false;
+            uploadErrors.databaseImageUrl = `${req.protocol}://${req.headers.host}/Database/Avatars/${file.filename}`;
+          }
+        }
+      };
+
+      await Promise.all([uploadToServer(), uploadToDatabase()]);
+
+      if (Object.keys(uploadErrors).length > 0) {
+        return reply.send(uploadErrors);
+      }
+
+      return reply.status(200).send({ success: true });
 
     } catch (err) {
       console.log(err);
+      reply.status(500).send({ error: 'Internal server error' });
     }
   });
 
+  fastify.get('/Database/Avatars/:filename', async (req, reply) => {
+    async function readStreamToBuffer(stream) {
+      return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', chunk => chunks.push(chunk));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+        stream.on('error', err => reject(err));
+      });
+    }
+
+    const { filename } = req.params;
+    const bucket = new mongodb.GridFSBucket(fastify.mongo.db, { bucketName: 'avatars' });
+
+    // let fileCursor = bucket.find({ filename: filename });
+    // await fileCursor.toArray().then((files) => {
+    //   console.log(files);
+    // })
+
+    const downloadStream = bucket.openDownloadStreamByName(filename);
+
+    const buffer = await readStreamToBuffer(downloadStream);
+    if (!buffer) {
+      console.log('Error reading file');
+      return reply.status(400).send({ err: 'Error reading file' });
+    }
+
+    // console.log(buffer);
+    reply.header('Content-Type', 'image/png').send(buffer);
+  });
 
   // fastify.get('/Avatars', async function (req, reply) {
   //   try {

@@ -60,106 +60,30 @@ module.exports = async function (fastify) {
 
       for (const file of allFiles) {
 
-        // get file system stats part
+        // get file system file url
         const filePath = path.join(filesDirPath, file);
 
-        let fs_stats = null;
+        let serverImageUrl = null;
 
         if (fs.existsSync(filePath)) {
-          fs_stats = fs.statSync(filePath);
-          const metadata = await sharp(filePath).metadata();
-
-          fs_stats = {
-            extension: path.extname(file),
-            format: mime.lookup(filePath).split('/')[0],
-            resolution: `${metadata.width}x${metadata.height}`,
-            size: fs_stats.size,
-            url: serverFileUrlString + file,
-          }
-
-          // console.log("1")
-          // console.log(fs_stats);
+          serverImageUrl = serverFileUrlString + file;
         }
 
-        // get database stats part
+        // get database file url
         const fileCursor = bucket.find({ filename: file });
 
-        let db_stats = null;
+        let databaseImageUrl = null;
 
         const db_file = await fileCursor.toArray();
 
         if (db_file && db_file.length > 0) {
-          async function readStreamToBuffer(stream) {
-            return new Promise((resolve, reject) => {
-              const chunks = [];
-              stream.on('data', chunk => chunks.push(chunk));
-              stream.on('end', () => resolve(Buffer.concat(chunks)));
-              stream.on('error', err => reject(err));
-            });
-          }
-
-          const downloadStream = bucket.openDownloadStreamByName(file);
-
-          const buffer = await readStreamToBuffer(downloadStream);
-          if (buffer) {
-            const metadata = await sharp(buffer).metadata();
-
-            const fileTypeResult = await fileType.fromBuffer(buffer);
-            const extension = fileTypeResult ? `.${fileTypeResult.ext}` : '';
-
-            const mimeType = fileTypeResult ? fileTypeResult.mime : mime.lookup(extension);
-
-            const size = buffer.length;
-
-            db_stats = {
-              extension: extension,
-              format: mimeType.split('/')[0],
-              resolution: `${metadata.width}x${metadata.height}`,
-              size: size,
-              url: databaseFileUrlString + file,
-            }
-
-            // console.log("2")
-            // console.log(db_stats);
-
-            // console.log(extension);
-            // console.log(mimeType);
-            // console.log(size);
-
-            // console.log(metadata);
-          }
-
-          // reply.header('Content-Type', 'image/png').send(buffer);
-
-        }
-
-        let joint_stats = null;
-
-        if (fs_stats && db_stats) {
-          const fs_stats_keys = Object.keys(fs_stats).filter(key => key !== 'url');
-          const db_stats_keys = Object.keys(db_stats).filter(key => key !== 'url');
-
-          if (fs_stats_keys.length === db_stats_keys.length) {
-            let isEqual = true;
-            for (let key of fs_stats_keys) {
-              if (fs_stats[key] !== db_stats[key]) {
-                isEqual = false;
-                break;
-              }
-            }
-            if (isEqual) {
-              joint_stats = fs_stats;
-              fs_stats = null;
-              db_stats = null;
-            }
-          }
+          databaseImageUrl = databaseFileUrlString + file;
         }
 
         files.push({
           filename: file,
-          fs_stats: fs_stats,
-          db_stats: db_stats,
-          joint_stats: joint_stats
+          serverImageUrl: serverImageUrl,
+          databaseImageUrl: databaseImageUrl,
         });
       }
 
@@ -169,6 +93,210 @@ module.exports = async function (fastify) {
       return reply.status(500).send({ error: 'Internal Server Error' });
     }
   });
+
+  fastify.get('/SyncImagesStorage/:filename', async function (req, reply) {
+    try {
+      const filename = req.params.filename;
+
+      let serverFileUrlString = `${req.protocol}://${req.headers.host}/Avatars/`;
+      let databaseFileUrlString = `${req.protocol}://${req.headers.host}/Database/Avatars/`;
+
+      // file system
+      const filesDirPath = path.join(process.cwd(), 'Images', 'Avatars');
+
+      // database
+      const bucket = new mongodb.GridFSBucket(fastify.mongo.db, { bucketName: 'avatars' });
+      const fileCursor = await bucket.find({ filename: filename }).toArray();
+
+      const filePath = path.join(filesDirPath, filename);
+
+      if (!fs.existsSync(filePath) && !fileCursor.length > 0) {
+        return reply.status(200).send({ msg: 'Synchronize is not available' });
+      }
+
+      if (fs.existsSync(filePath) && fileCursor.length > 0) {
+        return reply.status(200).send({ msg: 'Synchronize is not required' });
+      }
+
+      if (fs.existsSync(filePath)) {
+        const bucket = new mongodb.GridFSBucket(fastify.mongo.db, { bucketName: 'avatars' });
+
+        const uploadStream = bucket.openUploadStream(filename);
+        const uploadStreamPromise = new Promise((resolve, reject) => {
+          uploadStream.on('error', reject);
+          uploadStream.on('finish', resolve);
+        });
+        const readStream = fs.createReadStream(filePath);
+        readStream.pipe(uploadStream);
+        await uploadStreamPromise;
+
+        const databaseFileUrl = databaseFileUrlString + filename;
+
+        return reply.send({ databaseImageUrl: databaseFileUrl });
+      }
+
+      if (fileCursor && fileCursor.length > 0) {
+        const bucket = new mongodb.GridFSBucket(fastify.mongo.db, { bucketName: 'avatars' });
+
+        const downloadStream = bucket.openDownloadStreamByName(filename);
+        const writeStream = fs.createWriteStream(filePath);
+
+        const downloadStreamPromise = new Promise((resolve, reject) => {
+          writeStream.on('error', reject);
+          writeStream.on('close', resolve);
+          downloadStream.on('error', reject);
+        });
+
+        downloadStream.pipe(writeStream);
+        await downloadStreamPromise;
+
+        const serverFileUrl = serverFileUrlString + filename;
+
+        return reply.send({ serverImageUrl: serverFileUrl });
+      }
+
+      return reply.send({ msg: 'Synchronize is not available' });
+    } catch (err) {
+      console.log(err);
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // fastify.get('/Avatars', async function (req, reply) {
+  //   try {
+  //     let serverFileUrlString = `${req.protocol}://${req.headers.host}/Avatars/`;
+  //     let databaseFileUrlString = `${req.protocol}://${req.headers.host}/Database/Avatars/`;
+
+  //     let files = [];
+
+  //     const filesDirPath = path.join(process.cwd(), 'Images', 'Avatars');
+  //     const ignoredFiles = ['.gitkeep'];
+
+  //     // file system read
+  //     const directoryFiles = fs.readdirSync(filesDirPath).filter(file => !ignoredFiles.includes(file));
+
+  //     // database read
+  //     const bucket = new mongodb.GridFSBucket(fastify.mongo.db, { bucketName: 'avatars' });
+  //     let fileCursor = bucket.find();
+  //     const dbFiles = await fileCursor.toArray();
+  //     const databaseFiles = dbFiles.map(file => file.filename);
+
+  //     // all files
+  //     const allFiles = [...new Set([...directoryFiles, ...databaseFiles])];
+
+  //     // console.log(allFiles);
+
+  //     for (const file of allFiles) {
+
+  //       // get file system stats part
+  //       const filePath = path.join(filesDirPath, file);
+
+  //       let fs_stats = null;
+
+  //       if (fs.existsSync(filePath)) {
+  //         fs_stats = fs.statSync(filePath);
+  //         const metadata = await sharp(filePath).metadata();
+
+  //         fs_stats = {
+  //           extension: path.extname(file),
+  //           format: mime.lookup(filePath).split('/')[0],
+  //           resolution: `${metadata.width}x${metadata.height}`,
+  //           size: fs_stats.size,
+  //           url: serverFileUrlString + file,
+  //         }
+
+  //         // console.log("1")
+  //         // console.log(fs_stats);
+  //       }
+
+  //       // get database stats part
+  //       const fileCursor = bucket.find({ filename: file });
+
+  //       let db_stats = null;
+
+  //       const db_file = await fileCursor.toArray();
+
+  //       if (db_file && db_file.length > 0) {
+  //         async function readStreamToBuffer(stream) {
+  //           return new Promise((resolve, reject) => {
+  //             const chunks = [];
+  //             stream.on('data', chunk => chunks.push(chunk));
+  //             stream.on('end', () => resolve(Buffer.concat(chunks)));
+  //             stream.on('error', err => reject(err));
+  //           });
+  //         }
+
+  //         const downloadStream = bucket.openDownloadStreamByName(file);
+
+  //         const buffer = await readStreamToBuffer(downloadStream);
+  //         if (buffer) {
+  //           const metadata = await sharp(buffer).metadata();
+
+  //           const fileTypeResult = await fileType.fromBuffer(buffer);
+  //           const extension = fileTypeResult ? `.${fileTypeResult.ext}` : '';
+
+  //           const mimeType = fileTypeResult ? fileTypeResult.mime : mime.lookup(extension);
+
+  //           const size = buffer.length;
+
+  //           db_stats = {
+  //             extension: extension,
+  //             format: mimeType.split('/')[0],
+  //             resolution: `${metadata.width}x${metadata.height}`,
+  //             size: size,
+  //             url: databaseFileUrlString + file,
+  //           }
+
+  //           // console.log("2")
+  //           // console.log(db_stats);
+
+  //           // console.log(extension);
+  //           // console.log(mimeType);
+  //           // console.log(size);
+
+  //           // console.log(metadata);
+  //         }
+
+  //         // reply.header('Content-Type', 'image/png').send(buffer);
+
+  //       }
+
+  //       let joint_stats = null;
+
+  //       if (fs_stats && db_stats) {
+  //         const fs_stats_keys = Object.keys(fs_stats).filter(key => key !== 'url');
+  //         const db_stats_keys = Object.keys(db_stats).filter(key => key !== 'url');
+
+  //         if (fs_stats_keys.length === db_stats_keys.length) {
+  //           let isEqual = true;
+  //           for (let key of fs_stats_keys) {
+  //             if (fs_stats[key] !== db_stats[key]) {
+  //               isEqual = false;
+  //               break;
+  //             }
+  //           }
+  //           if (isEqual) {
+  //             joint_stats = fs_stats;
+  //             fs_stats = null;
+  //             db_stats = null;
+  //           }
+  //         }
+  //       }
+
+  //       files.push({
+  //         filename: file,
+  //         fs_stats: fs_stats,
+  //         db_stats: db_stats,
+  //         joint_stats: joint_stats
+  //       });
+  //     }
+
+  //     reply.send(files);
+  //   } catch (err) {
+  //     console.log(err);
+  //     return reply.status(500).send({ error: 'Internal Server Error' });
+  //   }
+  // });
 
   // fastify.get('/Avatars', async function (req, reply) {
   //   try {
